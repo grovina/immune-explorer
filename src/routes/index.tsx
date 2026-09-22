@@ -49,11 +49,12 @@ function Index() {
 
   const affinity = Math.max(0.4, 180 / (1 + rounds * (0.45 + pressure / 100)));
   const mutations = useMemo(() => new Set(Array.from({ length: Math.min(rounds * 2, 8) }, (_, i) => (i * 5 + rounds * 3) % codons.length)), [rounds]);
-  const current = stages[stage];
+  const current = stages[stage] ?? stages[0];
+  if (!current) return null;
   const randomize = () => {
-    const pick = (key: SegmentKey) => segmentOptions[key][Math.floor(Math.random() * segmentOptions[key].length)];
+    const pick = (key: SegmentKey) => segmentOptions[key][Math.floor(Math.random() * segmentOptions[key].length)] ?? segmentOptions[key][0] ?? "";
     setSegments({ v: pick("v"), d: pick("d"), j: pick("j") });
-    setJunction(Array.from({ length: 3 + Math.floor(Math.random() * 6) }, () => "ACGT"[Math.floor(Math.random() * 4)]).join(""));
+    setJunction(Array.from({ length: 3 + Math.floor(Math.random() * 6) }, () => "ACGT".charAt(Math.floor(Math.random() * 4))).join(""));
   };
   const reset = () => { setStage(0); setOrigin("maternal"); setSegments({ v: "IGHV3-23", d: "IGHD6-19", j: "IGHJ4" }); setJunction("TACGGA"); setRounds(0); setPressure(65); setIsotype("IgM"); };
 
