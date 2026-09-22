@@ -179,9 +179,41 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
+@keyframes shuffle-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes segment-shuffle {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
+  45% { transform: translateY(-3px) scale(.94); opacity: .55; }
+}
+
+@keyframes segment-settle {
+  0% { transform: scale(.88); filter: brightness(1.35); }
+  65% { transform: scale(1.06); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes junction-shuffle {
+  0%, 100% { transform: translateX(0); opacity: 1; }
+  25% { transform: translateX(3px); opacity: .62; }
+  75% { transform: translateX(-3px); opacity: .78; }
+}
+
+@keyframes junction-settle {
+  0% { transform: translateY(4px); opacity: .45; box-shadow: 0 0 0 0 color-mix(in oklch, var(--generated) 35%, transparent); }
+  55% { transform: translateY(0); opacity: 1; box-shadow: 0 0 0 4px color-mix(in oklch, var(--generated) 12%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
 @utility lab-rise { animation: lab-rise .45s cubic-bezier(.32,.72,0,1) both; }
 @utility antigen-bind { animation: antigen-bind 2.8s ease-in-out infinite; }
 @utility mutation-flash { animation: mutation-flash .35s ease-out both; }
+@utility shuffle-spin { animation: shuffle-spin .5s linear infinite; }
+@utility segment-shuffle { animation: segment-shuffle .18s ease-in-out infinite; }
+@utility segment-settle { animation: segment-settle .34s cubic-bezier(.22,.8,.3,1) both; }
+@utility junction-shuffle { animation: junction-shuffle .16s ease-in-out infinite; }
+@utility junction-settle { animation: junction-settle .48s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Dna, Info, RotateCcw, Shuffle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,17 +46,56 @@ function Index() {
   const [pressure, setPressure] = useState(65);
   const [isotype, setIsotype] = useState("IgM");
   const [selectedRegion, setSelectedRegion] = useState("CDR3");
+  const [isRandomizing, setIsRandomizing] = useState(false);
+  const [shuffleKey, setShuffleKey] = useState(0);
+  const shuffleTimers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
 
   const affinity = Math.max(0.4, 180 / (1 + rounds * (0.45 + pressure / 100)));
   const mutations = useMemo(() => new Set(Array.from({ length: Math.min(rounds * 2, 8) }, (_, i) => (i * 5 + rounds * 3) % codons.length)), [rounds]);
   const current = stages[stage] ?? stages[0];
   if (!current) return null;
-  const randomize = () => {
-    const pick = (key: SegmentKey) => segmentOptions[key][Math.floor(Math.random() * segmentOptions[key].length)] ?? segmentOptions[key][0] ?? "";
-    setSegments({ v: pick("v"), d: pick("d"), j: pick("j") });
-    setJunction(Array.from({ length: 3 + Math.floor(Math.random() * 6) }, () => "ACGT".charAt(Math.floor(Math.random() * 4))).join(""));
+  const clearShuffleTimers = () => {
+    shuffleTimers.current.forEach(clearTimeout);
+    shuffleTimers.current = [];
   };
-  const reset = () => { setStage(0); setOrigin("maternal"); setSegments({ v: "IGHV3-23", d: "IGHD6-19", j: "IGHJ4" }); setJunction("TACGGA"); setRounds(0); setPressure(65); setIsotype("IgM"); };
+  useEffect(() => clearShuffleTimers, []);
+  const randomSelection = () => {
+    const pick = (key: SegmentKey) => segmentOptions[key][Math.floor(Math.random() * segmentOptions[key].length)] ?? segmentOptions[key][0] ?? "";
+    return {
+      segments: { v: pick("v"), d: pick("d"), j: pick("j") },
+      junction: Array.from({ length: 3 + Math.floor(Math.random() * 6) }, () => "ACGT".charAt(Math.floor(Math.random() * 4))).join(""),
+    };
+  };
+  const randomize = () => {
+    if (isRandomizing) return;
+    clearShuffleTimers();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const result = randomSelection();
+      setSegments(result.segments);
+      setJunction(result.junction);
+      setShuffleKey(key => key + 1);
+      return;
+    }
+    setIsRandomizing(true);
+    [80, 170, 270, 380, 500].forEach(delay => {
+      const timer = setTimeout(() => {
+        const preview = randomSelection();
+        setSegments(preview.segments);
+        setJunction(preview.junction);
+      }, delay);
+      shuffleTimers.current.push(timer);
+    });
+    const finalTimer = setTimeout(() => {
+      const result = randomSelection();
+      setSegments(result.segments);
+      setJunction(result.junction);
+      setIsRandomizing(false);
+      setShuffleKey(key => key + 1);
+      shuffleTimers.current = [];
+    }, 640);
+    shuffleTimers.current.push(finalTimer);
+  };
+  const reset = () => { clearShuffleTimers(); setIsRandomizing(false); setStage(0); setOrigin("maternal"); setSegments({ v: "IGHV3-23", d: "IGHD6-19", j: "IGHJ4" }); setJunction("TACGGA"); setRounds(0); setPressure(65); setIsotype("IgM"); };
 
   return <div className="min-h-screen bg-background text-foreground antialiased">
     <header className="sticky top-0 z-30 border-b border-border bg-card/85 backdrop-blur-xl">
@@ -79,17 +118,17 @@ function Index() {
         <section className="lab-rise overflow-hidden rounded-lg border border-border bg-card" key={stage}>
           <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-end sm:justify-between">
             <div><p className="mb-1 font-mono text-[10px] text-primary">STAGE {stage + 1} / {stages.length}</p><h1 className="font-display text-2xl font-bold">{current.title}</h1><p className="mt-1 text-[12px] text-muted-foreground">{current.place}</p></div>
-            <div className="flex gap-2"><Button variant="lab" size="sm" onClick={randomize}><Shuffle />Randomize V·D·J</Button><Button variant="labOutline" size="sm" onClick={reset}><RotateCcw />Reset</Button></div>
+             <div className="flex gap-2"><Button variant="lab" size="sm" onClick={randomize} disabled={isRandomizing} aria-live="polite"><Shuffle className={cn(isRandomizing && "shuffle-spin")} />{isRandomizing ? "Shuffling…" : "Randomize V·D·J"}</Button><Button variant="labOutline" size="sm" onClick={reset}><RotateCcw />Reset</Button></div>
           </div>
 
           <div className="p-4">
             <div className="mb-4 flex items-center justify-between"><span className="font-mono text-[10px] text-muted-foreground">GERMLINE LOCUS · 5′ → 3′ · NOT TO SCALE</span><span className={cn("font-mono text-[10px]", origin === "maternal" ? "text-maternal" : "text-paternal")}>{origin.toUpperCase()} ALLELE ACTIVE</span></div>
             <div className="space-y-3">
-              {(["v","d","j"] as SegmentKey[]).map(key => <div key={key} className="flex items-center gap-3"><span className="w-10 font-mono text-[10px] text-muted-foreground">IGH{key.toUpperCase()}</span><div className="grid flex-1 gap-1" style={{gridTemplateColumns:`repeat(${segmentOptions[key].length}, minmax(0,1fr))`}}>{segmentOptions[key].map(opt => <button key={opt} onClick={() => setSegments(s => ({...s,[key]:opt}))} className={cn("h-9 truncate rounded-md px-1 font-mono text-[10px] ring-1 transition", segments[key] === opt ? origin === "maternal" ? "bg-maternal/15 text-maternal ring-maternal/45" : "bg-paternal/15 text-paternal ring-paternal/45" : "bg-muted/60 text-muted-foreground ring-border hover:bg-muted")}>{opt.replace("IGH","")}</button>)}</div></div>)}
+               {(["v","d","j"] as SegmentKey[]).map(key => <div key={key} className="flex items-center gap-3"><span className="w-10 font-mono text-[10px] text-muted-foreground">IGH{key.toUpperCase()}</span><div className="grid flex-1 gap-1" style={{gridTemplateColumns:`repeat(${segmentOptions[key].length}, minmax(0,1fr))`}}>{segmentOptions[key].map(opt => <button key={`${opt}-${shuffleKey}`} onClick={() => setSegments(s => ({...s,[key]:opt}))} disabled={isRandomizing} className={cn("h-9 truncate rounded-md px-1 font-mono text-[10px] ring-1 transition", segments[key] === opt ? origin === "maternal" ? "bg-maternal/15 text-maternal ring-maternal/45" : "bg-paternal/15 text-paternal ring-paternal/45" : "bg-muted/60 text-muted-foreground ring-border hover:bg-muted", segments[key] === opt && (isRandomizing ? "segment-shuffle" : shuffleKey > 0 && "segment-settle"))}>{opt.replace("IGH","")}</button>)}</div></div>)}
               <div className="flex items-center gap-3"><span className="w-10 font-mono text-[10px] text-muted-foreground">IGHC</span><div className="flex flex-1 gap-1 overflow-hidden">{["Cμ","Cδ","Cγ3","Cγ1","Cα1","Cγ2","Cγ4","Cε","Cα2"].map((x,i)=><span key={x} className={cn("grid h-8 min-w-10 flex-1 place-items-center rounded bg-muted font-mono text-[9px] text-muted-foreground", isotype.includes(x.slice(1)) && "bg-primary/15 text-primary ring-1 ring-primary/35")}>{x}</span>)}</div></div>
             </div>
 
-            <div className="mt-5 rounded-lg border border-border bg-background p-3">
+             <div key={shuffleKey} className={cn("mt-5 rounded-lg border border-border bg-background p-3", isRandomizing ? "junction-shuffle" : shuffleKey > 0 && "junction-settle")}>
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-[10px] text-muted-foreground">REARRANGED VDJ EXON · {segments.v} / {segments.d} / {segments.j}</span><span className="font-mono text-[10px] text-generated">N-addition: {junction.length} nt · {junction}</span></div>
               <div className="flex flex-wrap gap-1">{codons.map((c,i)=><span key={`${c}-${i}`} className={cn("mutation-flash rounded px-1.5 py-1 font-mono text-[11px]", mutations.has(i) ? "bg-mutation/15 font-semibold text-mutation ring-1 ring-mutation/30" : i > 5 && i < 12 ? "bg-generated/15 text-generated" : origin === "maternal" ? "bg-maternal/12 text-maternal" : "bg-paternal/12 text-paternal")}>{mutations.has(i) ? c.split("").reverse().join("") : c}</span>)}</div>
             </div>
